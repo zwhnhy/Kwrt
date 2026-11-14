@@ -1,5 +1,5 @@
 diff --git a/target/linux/mediatek/dts/mt7987b-cudy-tr3600-v1.dts b/target/linux/mediatek/dts/mt7987b-cudy-tr3600-v1.dts
-index 11eca3512895cf..00000000000000 100644
+index 11eca3512895cf..11eca3512895cf 100644
 --- a/target/linux/mediatek/dts/mt7987b-cudy-tr3600-v1.dts
 +++ b/target/linux/mediatek/dts/mt7987b-cudy-tr3600-v1.dts
 @@ -85,5 +85,5 @@
