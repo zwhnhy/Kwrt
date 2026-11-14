@@ -2,7 +2,7 @@ diff --git a/target/linux/mediatek/dts/mt7987b-cudy-tr3600-v1.dts b/target/linux
 index 11eca3512895cf..00000000000000 100644
 --- a/target/linux/mediatek/dts/mt7987b-cudy-tr3600-v1.dts
 +++ b/target/linux/mediatek/dts/mt7987b-cudy-tr3600-v1.dts
-@@ -84,7 +84,7 @@
+@@ -85,5 +85,5 @@
  &fan {
  	fan-supply = <&fan_3p3v>;
 -	pwms = <&pwm 1 50000 0>;
@@ -10,7 +10,7 @@ index 11eca3512895cf..00000000000000 100644
  	status = "okay";
  };
  
-@@ -163,18 +163,18 @@
+@@ -164,14 +164,14 @@
  &pio {
 -	pwm1_pins: pwm1-pins {
 +	pwm0_pins: pwm0-pins {
