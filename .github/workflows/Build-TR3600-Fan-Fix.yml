@@ -1,0 +1,116 @@
+name: Build TR3600 v1 (fan PWM fix)
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: tr3600-fan-pwm-build
+  cancel-in-progress: false
+
+jobs:
+  build:
+    name: Build Kwrt for Cudy TR3600 v1
+    runs-on: ubuntu-24.04
+    timeout-minutes: 360
+    env:
+      DEBIAN_FRONTEND: noninteractive
+      TZ: Asia/Shanghai
+      REPO_TOKEN: ${{ github.token }}
+
+    steps:
+      - name: Checkout Kwrt configuration
+        uses: actions/checkout@v4
+        with:
+          ref: tr3600-fan-pwm-fix
+          fetch-depth: 1
+
+      - name: Free disk space
+        uses: coder-xiaomo/free-disk-space@main
+        with:
+          tool-cache: false
+          android: true
+          dotnet: true
+          haskell: true
+          large-packages: true
+          docker-images: true
+          swap-storage: true
+
+      - name: Install build dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends \
+            build-essential clang flex bison g++ gawk gcc-multilib \
+            g++-multilib gettext git libncurses-dev libssl-dev \
+            python3-setuptools rsync swig unzip zlib1g-dev file wget \
+            dwarves llvm python3-pyelftools libpython3-dev aria2 jq \
+            qemu-utils ccache rename libelf-dev device-tree-compiler \
+            libgmp-dev libmpc-dev libfuse-dev
+          sudo timedatectl set-timezone Asia/Shanghai
+          git config --global user.name "github-actions[bot]"
+          git config --global user.email "41898282+github-actions[bot]@users.noreply.github.com"
+
+      - name: Clone OpenWrt 25.12 source
+        run: |
+          git clone --depth 1 --branch openwrt-25.12 \
+            https://github.com/openwrt/openwrt.git openwrt
+
+      - name: Apply Kwrt customization scripts and configuration
+        run: |
+          set -euo pipefail
+          cp -a devices/common/. openwrt/
+          cp -a devices/mediatek_filogic/. openwrt/
+          cp -a devices/. openwrt/devices/
+          cd openwrt
+          chmod +x devices/common/diy.sh
+          /bin/bash devices/common/diy.sh
+
+          cp devices/common/.config .config
+          cat devices/mediatek_filogic/.config >> .config
+
+          # Explicitly select only the Cudy TR3600 v1 image.
+          sed -i '/^CONFIG_TARGET_DEVICE_mediatek_filogic_DEVICE_cudy_tr3600-v1=/d' .config
+          echo 'CONFIG_TARGET_DEVICE_mediatek_filogic_DEVICE_cudy_tr3600-v1=y' >> .config
+
+      - name: Apply device patches
+        run: |
+          set -euo pipefail
+          cd openwrt
+          mkdir -p devices/mediatek_filogic/patches
+          cp -n ../devices/mediatek_filogic/patches/*.patch devices/mediatek_filogic/patches/
+          find devices/mediatek_filogic/patches -maxdepth 1 -type f \
+            -name '*.patch' ! -name '*.revert.patch' ! -name '*.bin.patch' \
+            -print0 | sort -z | while IFS= read -r -d '' patchfile; do
+              echo "Applying ${patchfile}"
+              patch --batch --forward --no-backup-if-mismatch -p1 -F 1 -i "${patchfile}"
+            done
+
+      - name: Update feeds and configure target
+        run: |
+          set -euo pipefail
+          cd openwrt
+          ./scripts/feeds update -a
+          ./scripts/feeds install -a
+          make defconfig
+          grep -q '^CONFIG_TARGET_DEVICE_mediatek_filogic_DEVICE_cudy_tr3600-v1=y$' .config
+          grep -E '^(CONFIG_TARGET_|CONFIG_PACKAGE_kmod-hwmon-pwmfan|CONFIG_PACKAGE_kmod-mt7990-firmware)' .config | head -100
+
+      - name: Compile firmware
+        run: |
+          set -o pipefail
+          cd openwrt
+          echo "Build parallelism: $(nproc)"
+          make -j"$(nproc)" || make -j1 V=s
+
+      - name: Upload firmware artifacts
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: Kwrt-TR3600-v1-fan-PWM-fix
+          path: |
+            openwrt/bin/targets/mediatek/filogic/
+          if-no-files-found: warn
+          compression-level: 6
+          retention-days: 14
