@@ -2,6 +2,9 @@ name: Build TR3600 v1 (fan PWM fix)
 
 on:
   workflow_dispatch:
+  push:
+    branches:
+      - tr3600-fan-pwm-fix
 
 permissions:
   contents: read
